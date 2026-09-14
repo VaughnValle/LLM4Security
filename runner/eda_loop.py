@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 import jsonschema
@@ -90,7 +91,9 @@ async def execute(args):
             command=sys.executable, args=["-m", "guide_mcp.eda_server.server"], env=dict(os.environ)
         )
         async with stdio_client(params) as (read, write):
-            async with ClientSession(read, write) as session:
+            async with ClientSession(
+                read, write, read_timeout_seconds=timedelta(seconds=420)
+            ) as session:
                 await session.initialize()
                 prompt = f"Compile sources {json.dumps(args.sources)} with top {args.top}, then simulate."
                 return await run_loop(client, session, prompt, args.max_turns)

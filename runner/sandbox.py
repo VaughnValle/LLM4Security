@@ -47,6 +47,8 @@ def capture(argv, timeout):
             proc.wait()
         thread.join(timeout=5)
         output = retained.decode(errors="replace")
+        if timed_out:
+            output += f"\nCommand timed out after {timeout} seconds"
         if len(retained) == 65536:
             output += "\n[output truncated at 64 KiB]"
         return Execution(proc.returncode, output, timed_out)
@@ -96,20 +98,45 @@ class Sandbox:
             "infinity",
         ]
 
+    def export_artifact(self, name: str, filename: str) -> Execution:
+        """Read through exec: Docker's archive API cannot see tmpfs artifacts."""
+        destination = self.spec.workdir / filename
+        limit = 64 * 1024**2
+        command = [
+            "docker",
+            "exec",
+            name,
+            "/bin/sh",
+            "-c",
+            'test -f "$1" && test ! -L "$1" && exec head -c 67108865 -- "$1"',
+            "eda-export",
+            f"/work/{filename}",
+        ]
+        try:
+            with destination.open("xb") as output:
+                result = subprocess.run(command, stdout=output, stderr=subprocess.PIPE, timeout=15)
+            if result.returncode or destination.stat().st_size > limit:
+                destination.unlink()
+                return Execution(125, f"Could not export regular artifact {filename}")
+            return Execution(0, "")
+        except subprocess.TimeoutExpired:
+            destination.unlink(missing_ok=True)
+            return Execution(125, f"Timed out exporting {filename}", timed_out=True)
+
     def run(self, argv: list[str], outputs: tuple[str, ...] = ()) -> Execution:
         name = f"llm4security-{uuid.uuid4().hex}"
         start = time.monotonic()
         result = Execution(125, "")
         try:
             inspect = capture(
-                ["docker", "image", "inspect", "--format", "{{.Id}}", self.spec.image], 15
+                ["docker", "image", "inspect", "--format", "{{.Id}}", self.spec.image], 60
             )
             if inspect.returncode:
                 return inspect
-            created = capture(self.create_command(name, argv), 15)
+            created = capture(self.create_command(name, argv), 60)
             if created.returncode:
                 return created
-            started = capture(["docker", "start", name], 15)
+            started = capture(["docker", "start", name], 60)
             if started.returncode:
                 return started
             result = capture(["docker", "exec", name, *argv], self.spec.timeout_seconds)
@@ -122,20 +149,7 @@ class Sandbox:
                         continue
                     if filename not in ("design.vvp", "waveform.vcd"):
                         raise ValueError("Unsupported sandbox output")
-                    # Docker cp never follows source symlinks (no -L). Verify before reading.
-                    copied = capture(
-                        [
-                            "docker",
-                            "cp",
-                            f"{name}:/work/{filename}",
-                            str(self.spec.workdir / filename),
-                        ],
-                        15,
-                    )
-                    path = self.spec.workdir / filename
-                    if path.is_symlink():
-                        path.unlink()
-                        return Execution(125, "Rejected symlink artifact")
+                    copied = self.export_artifact(name, filename)
                     if filename == "design.vvp" and copied.returncode:
                         result.returncode = 125
                         result.output += copied.output
@@ -145,6 +159,6 @@ class Sandbox:
         finally:
             result.duration_seconds = time.monotonic() - start
             try:
-                capture(["docker", "rm", "--force", name], 15)
+                capture(["docker", "rm", "--force", name], 60)
             except OSError:
                 pass

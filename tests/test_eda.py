@@ -173,3 +173,25 @@ def test_real_docker_loop(guide, tmp_path):
     result = eda.simulate(compiled.run_id)
     assert result.ok and "PASS" in result.output, result.output
     assert any(p.endswith("waveform.vcd") for p in result.artifact_paths)
+
+
+def test_artifact_export_preserves_binary_and_removes_failed_output(tmp_path, monkeypatch):
+    payload = b"\x00\xff\ncompiled bytes"
+
+    def fake_run(argv, *, stdout, stderr, timeout):
+        assert argv[:3] == ["docker", "exec", "test-container"]
+        assert "test ! -L" in argv[5]
+        stdout.write(payload)
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr("runner.sandbox.subprocess.run", fake_run)
+    sandbox = Sandbox(SandboxSpec(tmp_path))
+    assert sandbox.export_artifact("test-container", "design.vvp").returncode == 0
+    assert (tmp_path / "design.vvp").read_bytes() == payload
+
+    def failing_run(argv, **kwargs):
+        return subprocess.CompletedProcess(argv, 1)
+
+    monkeypatch.setattr("runner.sandbox.subprocess.run", failing_run)
+    assert sandbox.export_artifact("test-container", "waveform.vcd").returncode != 0
+    assert not (tmp_path / "waveform.vcd").exists()
