@@ -2,12 +2,11 @@
 
 **EDA-grounded multi-agent LLM orchestration for hardware security research.**
 
-LLM4Security is a local, reproducible research platform for evaluating **multi-agent LLM orchestration in hardware-security workflows**. It is an independent framework designed to integrate with the [GUIDE](https://github.com/GUIDE-EDA/GUIDE) ecosystem — using GUIDE and Trust-Hub workloads as its initial evaluation suite, without assuming it lives inside a GUIDE checkout — while combining a Hermes-based orchestration layer, a local **Qwen3.8-27B** model, and MCP-wrapped EDA tooling to test whether specialized agent delegation with EDA-grounded feedback beats a single tool-using LLM.
+LLM4Security is a local, reproducible research platform for evaluating **multi-agent LLM orchestration in hardware-security workflows**. It is an independent framework designed to integrate with [GUIDE](https://github.com/GUIDE-EDA/GUIDE) while combining a Hermes-based orchestration layer, a local **Qwen3.8-27B** model, and MCP-wrapped EDA tooling.
 
-The **Phase 1 reference implementation** targets a single **AMD Radeon AI PRO R9700 (32 GB)** running a shared Qwen3.8-27B endpoint for the Hermes Supervisor and every specialist agent — this is the platform the project is actually built and tested against. A later **2× R9700** deployment (see [Scale-Out](#scale-out-dual-r9700)) adds a second independent model replica for higher agent concurrency, independent-verifier experiments, and larger benchmark sweeps, without changing the core architecture.
+An LLM hypothesizes vulnerabilities and drafts security properties, while the simulation, synthesis, and formal verification run in disposable sandboxes that validate the LLM "supervisor's" hypotheses into findings.
 
-> **Core principle: Agents propose; tools decide.**
-> The LLM hypothesizes vulnerabilities and drafts security properties, but simulation, synthesis, and formal verification — run in disposable sandboxes — are what turn a hypothesis into a finding.
+The goal here is to test whether specialized agent delegation with EDA-grounded feedback beats a single use LLM as a tool.
 
 ## Research Question
 
@@ -19,8 +18,7 @@ The design deliberately separates three variables so ablations are controlled ra
 2. **Orchestration capability** — Hermes Supervisor + delegated specialists
 3. **Hardware ground truth** — simulation, synthesis, formal verification, GUIDE/Trust-Hub tooling
 
-## Architecture
-
+## Architectur
 ```mermaid
 flowchart TD
     U[Researcher / Experiment CLI] --> H[Hermes Supervisor]
