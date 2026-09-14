@@ -61,6 +61,7 @@ async def run_loop(client, session, prompt, max_turns=8):
             raise ValueError("Model exceeded the per-turn tool-call budget")
         for call in calls:
             name = call["function"]["name"]
+            arguments = None
             try:
                 if name not in allowed:
                     raise ValueError("Tool is not allowed")
@@ -76,7 +77,7 @@ async def run_loop(client, session, prompt, max_turns=8):
                         verified = True
             except (ValueError, jsonschema.ValidationError) as exc:
                 payload = {"isError": True, "error": str(exc)[:2000]}
-            events.append({"type": "tool", "name": name, "result": payload})
+            events.append({"type": "tool", "name": name, "arguments": arguments, "result": payload})
             messages.append(
                 {"role": "tool", "tool_call_id": call["id"], "content": json.dumps(payload)}
             )
