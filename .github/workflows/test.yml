@@ -1,0 +1,20 @@
+name: tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  phase1:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.22"
+          enable-cache: true
+      - run: uv sync --python 3.12 --frozen --extra dev --extra eda
+      - run: uv run --no-sync ruff check .
+      - run: sudo apt-get update && sudo apt-get install -y iverilog
+      - run: docker build -t llm4security-eda:phase1 containers/eda
+      - run: uv run --no-sync pytest -q
+        env:
+          RUN_DOCKER_TESTS: "1"

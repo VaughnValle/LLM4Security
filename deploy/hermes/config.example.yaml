@@ -1,0 +1,14 @@
+# Merge into ~/.hermes/config.yaml; substitute the two absolute paths below.
+model:
+  default: Qwen3.8-27B
+  provider: custom
+  base_url: http://127.0.0.1:8000/v1
+mcp_servers:
+  guide-eda-mcp:
+    timeout: 240
+    supports_parallel_tool_calls: false
+    command: /absolute/path/to/LLM4Security/.venv/bin/guide-eda-mcp
+    env:
+      GUIDE_ROOT: /absolute/path/to/GUIDE
+      EDA_ARTIFACT_ROOT: /absolute/path/to/LLM4Security/results/eda
+      EDA_IMAGE: llm4security-eda:phase1

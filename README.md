@@ -4,7 +4,7 @@
 
 LLM4Security is a local, reproducible research platform for evaluating **multi-agent LLM orchestration in hardware-security workflows**. It is an independent framework designed to integrate with the [GUIDE](https://github.com/GUIDE-EDA/GUIDE) ecosystem — using GUIDE and Trust-Hub workloads as its initial evaluation suite, without assuming it lives inside a GUIDE checkout — while combining a Hermes-based orchestration layer, a local **Qwen3.8-27B** model, and MCP-wrapped EDA tooling to test whether specialized agent delegation with EDA-grounded feedback beats a single tool-using LLM.
 
-The **Phase 1 reference implementation** targets a single **AMD Radeon AI PRO R9700 (32 GB)** running a shared Qwen3.8-27B endpoint for the Hermes Supervisor and every specialist agent — this is the platform the project is actually built and tested against. A later **2× R9700** deployment (see [Scale-Out](#scale-out-dual-r9700)) adds a second independent model replica for higher agent concurrency, independent-verifier experiments, and larger benchmark sweeps, without changing the core architecture.
+The **Phase 1 reference implementation** targets a single **AMD Radeon AI PRO R9700 (32 GB)** running a shared Qwen3.8-27B endpoint for the Hermes Supervisor and every specialist agent — this is the deployment target; hardware validation is pending. A later **2× R9700** deployment (see [Scale-Out](#scale-out-dual-r9700)) adds a second independent model replica for higher agent concurrency, independent-verifier experiments, and larger benchmark sweeps, without changing the core architecture.
 
 > **Core principle: Agents propose; tools decide.**
 > The LLM hypothesizes vulnerabilities and drafts security properties, but simulation, synthesis, and formal verification — run in disposable sandboxes — are what turn a hypothesis into a finding.
@@ -102,16 +102,16 @@ The Supervisor keeps a running hypothesis ledger scored against evidence IDs —
 | Component | Reference setup |
 |---|---|
 | **GPU** | 1× Radeon AI PRO R9700 (32 GB) |
-| **CPU** | 16–24+ strong cores |
-| **RAM** | 128 GB minimum; 192–256 GB preferred |
+| **CPU** | Ryzen 3950X (16 cores / 32 threads) |
+| **RAM** | 96 GB installed on Proxmox host; start with a 64 GB GPU guest |
 | **Storage** | 2–4 TB NVMe |
 | **Network** | 10 GbE preferred |
 | **OS** | Ubuntu 24.04 |
 | **GPU runtime** | ROCm |
 | **Model** | Qwen3.8-27B, ~4-bit |
 | **Serving** | vLLM |
-| **Default context** | 64K |
-| **Concurrency** | 1–2 active generations initially |
+| **Default context** | 8K bring-up; validate 64K separately |
+| **Concurrency** | 1 active generation initially |
 | **Orchestration** | Hermes Agent |
 
 A single GPU is primarily a **throughput constraint**, not a functional limitation — specialist agents are logical roles sharing one model endpoint, while EDA jobs run mainly on CPU resources. **RAM is not optional headroom:** the CPU simultaneously runs Verilator/Yosys compilations, formal solvers, container overhead, and PostgreSQL/MinIO, so a strong GPU paired with a weak CPU or insufficient RAM is a poor trade even at this scale.
@@ -137,7 +137,7 @@ As throughput needs grow, the Analyst can later be split into RTL Analyst / Secu
 |---|---|
 | Model | Qwen3.8-27B (fixed across all agents to avoid confounding orchestration results with model differences) |
 | Quantization | ~4-bit |
-| Context | 64K (default; avoid maxing this out — KV cache competes with weights and runtime buffers inside 32 GB VRAM) |
+| Context | 8K bring-up default; 64K is a separate hardware acceptance target |
 | Serving | vLLM (primary), SGLang (comparison backend), llama.cpp (reference baseline) |
 | Concurrency | 1–2 active generations initially |
 
@@ -151,7 +151,7 @@ Tools are wrapped in domain-specific MCP servers rather than giving the LLM raw 
 
 ### `guide-eda-mcp`
 
-Planned operations, wrapping standard EDA in ephemeral Docker/Git worktrees:
+Implemented in disposable Docker containers: `compile_rtl()` and `simulate()` (see [Phase 1](docs/phase1.md)). Full planned interface:
 `lint_rtl()`, `compile_rtl()`, `simulate()`, `run_cocotb()`, `synthesize()`, `get_netlist_stats()`, `prove_property()`, `find_counterexample()`, `parse_vcd()` (JSON or rendered PNG for multimodal review), `compare_outputs()`
 
 ### `guide-security-mcp`
@@ -208,7 +208,7 @@ LLM4Security/
 │
 ├── agents/              # Supervisor, Analyst, Verifier, Critic prompts/configs
 ├── skills/              # rtl-analysis, security-assertions, formal-verification, trojan-analysis
-├── mcp/
+├── guide_mcp/
 │   ├── eda_server/
 │   └── security_server/
 ├── broker/              # Redis task queue + PostgreSQL evidence/hypothesis store
@@ -234,7 +234,7 @@ LLM4Security/
 
 ## Ablation Plan
 
-Keep model, quantization, context budget (64K), and tool versions fixed across all configurations:
+Planned experiments hold model, quantization, context budget (64K after validation), and tool versions fixed across all configurations:
 
 | Config | Model | Tools | Agents |
 |---|---|---|---:|
@@ -315,7 +315,13 @@ Worker-pool replica scaling · higher-precision or larger local models · RTL/se
 
 ## Status
 
-This repository is currently an **initial research scaffold**. Most modules intentionally contain interfaces, schemas, configuration examples, and TODOs rather than complete implementations.
+The **Phase 1 software path** is implemented: single-R9700 ROCm/vLLM configuration,
+OpenAI endpoint acceptance checks, Hermes configuration, `guide-eda-mcp` stdio tools
+for `compile_rtl()` and `simulate()`, and a bounded single-agent feedback loop.
+See [Phase 1 deployment and validation](docs/phase1.md) for the 96 GB Proxmox host,
+installation, tests, and remaining hardware acceptance gates. GPU/Hermes deployment
+is not yet validated. Broker, multi-agent experiments, and other EDA tools remain
+scaffolds.
 
 ## License
 
