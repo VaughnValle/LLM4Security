@@ -1,0 +1,8 @@
+name: single-gpu-reference
+model: Qwen3.8-27B
+context_tokens: 65536
+tools_enabled: true
+agents: [supervisor, analyst, verifier, critic]
+hardware:
+  gpu: "1x AMD Radeon AI PRO R9700 32GB"
+  max_active_generations: 2

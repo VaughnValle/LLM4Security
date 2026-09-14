@@ -1,0 +1,5 @@
+name: ablation-c-basic-orchestration
+model: Qwen3.8-27B
+context_tokens: 65536
+tools_enabled: true
+agents: [supervisor, analyst, verifier]

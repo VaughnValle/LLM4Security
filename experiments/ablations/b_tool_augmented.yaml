@@ -1,0 +1,5 @@
+name: ablation-b-tool-augmented
+model: Qwen3.8-27B
+context_tokens: 65536
+tools_enabled: true
+agents: [supervisor]

@@ -1,0 +1,4 @@
+name: analyst
+enabled: true
+model: "${LLM_MODEL}"
+max_parallel_tasks: 1

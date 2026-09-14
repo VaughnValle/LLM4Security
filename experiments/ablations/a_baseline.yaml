@@ -1,0 +1,5 @@
+name: ablation-a-baseline
+model: Qwen3.8-27B
+context_tokens: 65536
+tools_enabled: false
+agents: [supervisor]
