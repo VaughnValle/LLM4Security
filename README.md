@@ -18,7 +18,7 @@ The design deliberately separates three variables so ablations are controlled ra
 2. **Orchestration capability** — Hermes Supervisor + delegated specialists
 3. **Hardware ground truth** — simulation, synthesis, formal verification, GUIDE/Trust-Hub tooling
 
-## Architectur
+## Architecture
 ```mermaid
 flowchart TD
     U[Researcher / Experiment CLI] --> H[Hermes Supervisor]
