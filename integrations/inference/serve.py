@@ -39,6 +39,7 @@ def command(env=None):
         "8000",
         "--tensor-parallel-size",
         "1",
+        "--language-model-only",
         "--dtype",
         "auto",
         "--max-model-len",

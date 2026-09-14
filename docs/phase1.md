@@ -10,10 +10,11 @@ validation; unit tests are not evidence of GPU compatibility or security finding
 
 The supplied machine is `https://10.0.89.35:8006`, Ryzen 3950X, 96 GB system RAM,
 with one 32 GB Radeon AI PRO R9700. Port 8006 is Proxmox management, not inference.
-Use a dedicated Ubuntu 24.04 Linux VM with the GPU passed through. The GPU guest's
-planned IP is `10.0.89.200`; the VM has not been created yet and its SSH login
-must be established during provisioning; this repository does not change
-Proxmox configuration or install drivers on the hypervisor.
+Use a dedicated Ubuntu 24.04 Linux VM with the GPU passed through. The deployed
+guest is VM 200 at `10.0.89.200`, with SSH user `researcher`. It uses Q35/OVMF,
+16 host-model vCPUs, 64 GB fixed RAM, and a 300 GB thin disk. Both functions of
+host device `0000:0c:00` are passed through. The hypervisor retains VFIO ownership;
+ROCm and Hermes run inside the guest.
 
 Suggested initial allocation: 16 vCPUs, 64 GB fixed guest RAM, and at least 200 GB
 free storage for the image, checkpoint/cache, and small experiments. Leave the rest
@@ -50,24 +51,29 @@ is AMD's [Qwen3.8-27B Quark AWQ INT4 W4A16](https://huggingface.co/amd/Qwen3.8-2
 pinned to a repository SHA. The served alias is `Qwen3.8-27B`; clients use the alias.
 The BF16 base checkpoint is not the single-card configuration.
 
-The example vLLM 0.23.0 ROCm image is pinned by its registry manifest digest. The
-registry artifact and parser names were checked during implementation; **the
-image/checkpoint/kernel combination has not been validated on this R9700**. If it
-fails with unsupported gfx1201, Quark kernels, or model architecture, select/build
-a compatible ROCm vLLM image and set `VLLM_IMAGE` to its digest. Record that change
-with test results; do not silently switch models or use a CUDA image.
+Build `containers/inference/Dockerfile` with `make inference-image`. It pins the
+vLLM 0.28.0 ROCm base by digest and applies a checksum-verified upstream native
+Quark INT4 backport. The checkpoint requires this scheme; an unmodified 0.23.0
+image passed GPU preflight but failed while mapping Quark configuration.
+The backport comes from [PR #52642](https://github.com/vllm-project/vllm/pull/52642),
+folded into the still-open [PR #48606](https://github.com/vllm-project/vllm/pull/48606).
+It uses fixed source commits, checks patch applicability, and makes no checkpoint
+changes. Revalidate before replacing this with a newer release.
 
 ```bash
 # Validate resolved configuration without printing its API key.
 docker compose --env-file .env -f deploy/inference/compose.yaml config --quiet
-# Pull image and check GPU/runtime before downloading model weights.
+# Build image and check GPU/runtime before downloading model weights.
+make inference-image
 docker compose --env-file .env -f deploy/inference/compose.yaml run --rm inference --preflight-only
 make inference-up
 docker compose --env-file .env -f deploy/inference/compose.yaml logs -f inference
 make inference-smoke
 ```
 
-The launcher checks for one visible GPU, gfx1201 and ~32 GB VRAM. Defaults are TP=1,
+The launcher checks for one visible GPU, gfx1201 and ~32 GB VRAM. It serves the
+language model only, avoiding vision-encoder allocation for this text/RTL loop.
+Defaults are TP=1,
 8,192 context tokens, one active sequence, eager execution, and 85% GPU memory use.
 Quantization is read from the checkpoint metadata. The inference container has a
 48 GB host-memory cap, 12 CPU quota, and 8 GB shared memory. No claim is made that
@@ -111,6 +117,24 @@ make eda-image
 uv run --extra eda --env-file .env llm4security-eda-loop \
   path/to/design.sv path/to/tb.sv --top tb --output results/first-loop.json
 ```
+
+The deployment smoke case uses GUIDE's pinned VerilogEval reference and a wrapper
+from this repository; it does not vendor benchmark source:
+
+```bash
+export GUIDE_ROOT=/home/researcher/GUIDE # Or your own external checkout.
+git -C "$GUIDE_ROOT" submodule update --init --depth 1 benchmark/VerilogEval
+mkdir -p "$GUIDE_ROOT/.llm4security-smoke"
+cp examples/eda/notgate_acceptance.sv "$GUIDE_ROOT/.llm4security-smoke/"
+uv run --extra eda --env-file .env llm4security-eda-loop \
+  benchmark/VerilogEval/dataset_spec-to-rtl/Prob005_notgate_ref.sv \
+  .llm4security-smoke/notgate_acceptance.sv --top tb \
+  --output results/first-loop.json
+```
+
+The wrapper checks both NOT-gate inputs with `$fatal` on mismatch and emits
+`GUIDE_NOTGATE_PASS`. This validates reference execution and tool plumbing, not
+generated RTL quality or a security property.
 
 `compile_rtl(sources, top=None, timeout_seconds=60)` accepts 1–128 GUIDE-relative
 Verilog/SystemVerilog files, totaling at most 16 MiB. List included `.vh`/`.svh`

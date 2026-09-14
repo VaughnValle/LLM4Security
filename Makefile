@@ -12,9 +12,12 @@ infra-up:
 infra-down:
 	docker compose down
 
-.PHONY: eda-image inference-up inference-down inference-smoke eda-loop
+.PHONY: eda-image inference-image inference-up inference-down inference-smoke eda-loop
 eda-image:
 	docker build -t llm4security-eda:phase1 containers/eda
+
+inference-image:
+	docker build -t llm4security-inference:phase1 containers/inference
 
 inference-up:
 	docker compose --env-file .env -f deploy/inference/compose.yaml up -d

@@ -12,6 +12,7 @@ def test_single_gpu_command_does_not_leak_key():
     argv = command({"VLLM_MODEL_REVISION": "a" * 40, "VLLM_API_KEY": "secret"})
     assert "secret" not in argv
     assert argv[argv.index("--tensor-parallel-size") + 1] == "1"
+    assert "--language-model-only" in argv
     assert argv[argv.index("--max-model-len") + 1] == "8192"
     assert "--enable-auto-tool-choice" in argv
     assert "--trust-remote-code" not in argv
