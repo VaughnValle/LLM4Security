@@ -1,9 +1,18 @@
-# Merge into ~/.hermes/config.yaml; substitute the two absolute paths below.
+# Prefer scripts/configure_hermes.py: it authenticates, checks actual context,
+# and stores model.api_key privately (OPENAI_API_KEY alone is insufficient for
+# this Hermes custom-provider path). Never commit the populated config.
 model:
   default: Qwen3.8-27B
   provider: custom
   base_url: http://127.0.0.1:8000/v1
-  context_length: 8192
+  # Must match the real vLLM limit, never a compatibility override.
+  context_length: 65536
+  streaming: false
+agent:
+  max_turns: 8
+  reasoning_effort: none
+platform_toolsets:
+  cli: [guide-eda-mcp]
 mcp_servers:
   guide-eda-mcp:
     timeout: 420

@@ -1,6 +1,7 @@
 # Run from the repository root with --env-file .env.
 services:
   inference:
+    restart: unless-stopped
     image: ${VLLM_IMAGE:?Set a ROCm gfx1201 vLLM image tag or digest verified for Qwen3.8}
     entrypoint: ["python3", "/app/integrations/inference/serve.py"]
     environment:
@@ -9,7 +10,7 @@ services:
       VLLM_MODEL: ${VLLM_MODEL:-amd/Qwen3.8-27B-Quark-AWQ-INT4-W4A16}
       VLLM_MODEL_REVISION: ${VLLM_MODEL_REVISION:?Pin the checkpoint commit SHA}
       LLM_MODEL: ${LLM_MODEL:-Qwen3.8-27B}
-      VLLM_MAX_MODEL_LEN: ${VLLM_MAX_MODEL_LEN:-8192}
+      VLLM_MAX_MODEL_LEN: ${VLLM_MAX_MODEL_LEN:-65536}
       VLLM_MAX_NUM_SEQS: ${VLLM_MAX_NUM_SEQS:-1}
       VLLM_GPU_MEMORY_UTILIZATION: ${VLLM_GPU_MEMORY_UTILIZATION:-0.85}
       VLLM_TOOL_PARSER: ${VLLM_TOOL_PARSER:-qwen3_xml}

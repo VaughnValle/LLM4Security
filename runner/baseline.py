@@ -60,7 +60,7 @@ def evaluate(trace, sources, expected):
         if result.get("isError") or evidence.get("timed_out"):
             continue
         if event["name"] == "compile_rtl" and evidence.get("ok"):
-            if args.get("sources") == sources and args.get("top") == "tb":
+            if sorted(args.get("sources", [])) == sorted(sources) and args.get("top") == "tb":
                 compiled.add(evidence.get("run_id"))
         if event["name"] != "simulate" or args.get("run_id") not in compiled:
             continue

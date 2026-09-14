@@ -3,8 +3,9 @@
 This implementation provides an inference launcher, endpoint acceptance probe, two
 MCP tools, and a bounded single-agent feedback loop. It does **not** implement the
 broker or multi-agent experiments. Local tests cover real Icarus execution and MCP
-stdio. R9700 inference, Hermes itself, and Docker execution require deployment
-validation; unit tests are not evidence of GPU compatibility or security findings.
+stdio. R9700 inference, Docker execution, and an actual Hermes compile/simulate
+session have passed on the deployed guest. See [deployment evidence](r9700-deployment.md).
+Unit tests alone are not evidence of GPU compatibility or security findings.
 
 ## Proxmox deployment target
 
@@ -74,10 +75,10 @@ make inference-smoke
 The launcher checks for one visible GPU, gfx1201 and ~32 GB VRAM. It serves the
 language model only, avoiding vision-encoder allocation for this text/RTL loop.
 Defaults are TP=1,
-8,192 context tokens, one active sequence, eager execution, and 85% GPU memory use.
+65,536 context tokens, one active sequence, eager execution, and 85% GPU memory use.
 Quantization is read from the checkpoint metadata. The inference container has a
 48 GB host-memory cap, 12 CPU quota, and 8 GB shared memory. No claim is made that
-64K context or two simultaneous generations fits until measured.
+two simultaneous 64K generations fit; only one active sequence has been validated.
 
 The service binds guest loopback. For clients on your workstation, tunnel to the
 **guest**, then keep `OPENAI_BASE_URL=http://127.0.0.1:8000/v1`:
@@ -92,12 +93,13 @@ responses and usage to `results/inference-smoke.json`. A 200 health response alo
 is insufficient. Authentication failures, mismatched aliases, malformed calls,
 truncated generations, and ignored tool results fail the probe.
 
-After the 8K check passes, increase `VLLM_MAX_MODEL_LEN` in stages (16K, 32K, 64K),
-recreate inference, and run a padded probe, for example:
+The deployed card passed staged 16K, 32K, and 64K checks. For a changed runtime,
+repeat that progression with `VLLM_MAX_MODEL_LEN`, recreate inference, and run a
+padded probe, for example at the 64K setting:
 
 ```bash
 uv run --env-file .env llm4security-inference-smoke \
-  --padding-repeats 30000 --output results/inference-32k.json
+  --padding-repeats 64000 --min-prompt-tokens 64000 --output results/inference-64k.json
 ```
 
 Repeated words are **not** a tokenizer guarantee. Inspect `usage.prompt_tokens`
@@ -170,9 +172,22 @@ retention management. Server-wide scheduling/quotas are later work.
 ## Hermes
 
 The repository package is `guide_mcp`, avoiding a collision with the official
-Python `mcp` SDK. Merge `deploy/hermes/config.example.yaml` into Hermes' config,
-substitute absolute paths, and set the same `OPENAI_API_KEY` in the Hermes process
-(or its `.env`). The MCP process and Docker daemon must share the local filesystem;
+Python `mcp` SDK. Once the server advertises and has passed real 64K acceptance, run:
+
+```bash
+uv run --env-file .env python scripts/configure_hermes.py
+~/.local/bin/hermes mcp test guide-eda-mcp
+~/.local/bin/hermes chat
+```
+
+The setup checks the authenticated endpoint's actual context, backs up the existing
+config, stores the endpoint credential as private `model.api_key`, and selects the
+GUIDE MCP toolset for CLI sessions. This Hermes version deliberately does not use
+`OPENAI_API_KEY` for every custom endpoint. Exporting that variable alone did not fix
+authentication. `model.context_length` must match vLLM; falsely declaring 64K over
+an 8K server caused repeated HTTP 400 and compression failures. Starting new
+sessions did not fix that mismatch. Non-streaming requests avoid the runtime's
+streaming/tool-parser interoperability issue. The MCP process and Docker daemon must share the local filesystem;
 when using a GPU tunnel, EDA may run locally on a separate Linux Docker host.
 
 Hermes uses `provider: custom` for the OpenAI-compatible endpoint. Its name does
@@ -195,7 +210,8 @@ RUN_DOCKER_TESTS=1 uv run --no-sync pytest -q
 
 CI builds the EDA image and enables the Docker test. Local tests use the real
 Icarus compiler with a **test-only trusted-fixture adapter** where Docker is absent;
-production has no host-shell fallback. GPU launch, short/long-context acceptance,
-and an actual Hermes session remain required before reporting Phase 1 deployment
-as validated. Neither broker delegation nor the four-agent reference experiment
-is wired by this change.
+production has no host-shell fallback. Record GPU and Hermes acceptance separately
+from unit tests. Neither broker delegation nor the four-agent reference experiment
+is wired by this change. A synthetic single-agent authorization baseline is available
+via `uv run --extra eda --env-file .env python -m runner.baseline`; see
+[the baseline protocol](authorization-baseline.md).

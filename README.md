@@ -4,7 +4,7 @@
 
 LLM4Security is a local, reproducible research platform for evaluating **multi-agent LLM orchestration in hardware-security workflows**. It is an independent framework designed to integrate with the [GUIDE](https://github.com/GUIDE-EDA/GUIDE) ecosystem — using GUIDE and Trust-Hub workloads as its initial evaluation suite, without assuming it lives inside a GUIDE checkout — while combining a Hermes-based orchestration layer, a local **Qwen3.8-27B** model, and MCP-wrapped EDA tooling to test whether specialized agent delegation with EDA-grounded feedback beats a single tool-using LLM.
 
-The **Phase 1 reference implementation** targets a single **AMD Radeon AI PRO R9700 (32 GB)** running a shared Qwen3.8-27B endpoint for the Hermes Supervisor and every specialist agent — this is the deployment target; hardware validation is pending. A later **2× R9700** deployment (see [Scale-Out](#scale-out-dual-r9700)) adds a second independent model replica for higher agent concurrency, independent-verifier experiments, and larger benchmark sweeps, without changing the core architecture.
+The **Phase 1 reference implementation** runs on a single **AMD Radeon AI PRO R9700 (32 GB)**. Qwen3.8-27B inference and a single Hermes agent's compile/simulate workflow have been validated; see the [deployment record](docs/r9700-deployment.md). The Supervisor and specialist-agent topology below is planned. A later **2× R9700** deployment (see [Scale-Out](#scale-out-dual-r9700)) can add a second model replica for higher concurrency and independent-verifier experiments after the single-agent baseline is measured.
 
 > **Core principle: Agents propose; tools decide.**
 > The LLM hypothesizes vulnerabilities and drafts security properties, but simulation, synthesis, and formal verification — run in disposable sandboxes — are what turn a hypothesis into a finding.
@@ -47,7 +47,7 @@ flowchart TD
     OBS --> PROM[Prometheus / Grafana]
 ```
 
-Agents never get an unrestricted host shell — every EDA and security operation is exposed through a structured MCP server, run inside ephemeral Docker containers or task-specific Git worktrees. Delegation flows through the task broker (Redis queue) rather than nested agent conversations, with PostgreSQL holding evidence, hypotheses, and task state — so a crashed worker, context overflow, or model-server restart doesn't erase run history. See [Scale-Out](#scale-out-dual-r9700) for the dual-GPU supervisor/worker-pool topology.
+The deployed research toolset exposes compilation and simulation through MCP and ephemeral Docker containers. The planned architecture adds role restrictions, task worktrees, Redis delegation, and PostgreSQL evidence/hypothesis state. These broker and multi-agent components are still scaffolds. See [Scale-Out](#scale-out-dual-r9700) for the proposed dual-GPU topology.
 
 ## Evidence-Grounded Workflow
 
@@ -110,7 +110,7 @@ The Supervisor keeps a running hypothesis ledger scored against evidence IDs —
 | **GPU runtime** | ROCm |
 | **Model** | Qwen3.8-27B, ~4-bit |
 | **Serving** | vLLM |
-| **Default context** | 8K bring-up; validate 64K separately |
+| **Default context** | 64K validated on one R9700; one active sequence |
 | **Concurrency** | 1 active generation initially |
 | **Orchestration** | Hermes Agent |
 
@@ -319,9 +319,11 @@ The **Phase 1 software path** is implemented: single-R9700 ROCm/vLLM configurati
 OpenAI endpoint acceptance checks, Hermes configuration, `guide-eda-mcp` stdio tools
 for `compile_rtl()` and `simulate()`, and a bounded single-agent feedback loop.
 See [Phase 1 deployment and validation](docs/phase1.md) for the 96 GB Proxmox host,
-installation, tests, and remaining hardware acceptance gates. GPU/Hermes deployment
-is not yet validated. Broker, multi-agent experiments, and other EDA tools remain
-scaffolds.
+installation and tests, and the [deployment record](docs/r9700-deployment.md) for
+measured context capacity and Hermes acceptance. A [synthetic authorization
+baseline](docs/authorization-baseline.md) evaluates model verdicts against linked
+tool evidence. Broker, multi-agent experiments, source editing, and other EDA
+tools remain future work; a passing smoke test is not a hardware-security finding.
 
 ## License
 

@@ -42,3 +42,16 @@ This validates evidence interpretation for a deliberately simple property. Next
 research work should add larger labeled cases, independent testbenches, repeated
 trials, and a controlled source inspection/edit interface before autonomous repair.
 The current two-tool interface cannot autonomously revise RTL files.
+
+## Recorded trial: 2026-09-14
+
+`results/authorization-baseline-final.json` on the guest records the completed
+trial against the 65,536-token endpoint. Both cases used exactly one compile and
+one simulation. Case A passed the strict evaluator. Case B produced the expected
+`AUTHORIZATION_VIOLATION` and the model correctly explained the unauthorized grant,
+but prefixed its JSON verdict with prose. Consequently the strict JSON-only
+evaluator rejected that response: one of two cases passed overall.
+
+This is a response-format adherence failure, not a missed simulator violation.
+Retain this trial when testing improved prompts or structured output; do not
+silently loosen the evaluator or describe this result as a fully passing baseline.

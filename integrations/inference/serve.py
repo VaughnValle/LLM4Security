@@ -15,7 +15,7 @@ def command(env=None):
     revision = env.get("VLLM_MODEL_REVISION", "")
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise ValueError("Set VLLM_MODEL_REVISION to the checkpoint commit SHA")
-    context = int(env.get("VLLM_MAX_MODEL_LEN", "8192"))
+    context = int(env.get("VLLM_MAX_MODEL_LEN", "65536"))
     sequences = int(env.get("VLLM_MAX_NUM_SEQS", "1"))
     utilization = float(env.get("VLLM_GPU_MEMORY_UTILIZATION", "0.85"))
     if not 512 <= context <= 65536 or sequences not in (1, 2):

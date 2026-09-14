@@ -13,7 +13,7 @@ def test_single_gpu_command_does_not_leak_key():
     assert "secret" not in argv
     assert argv[argv.index("--tensor-parallel-size") + 1] == "1"
     assert "--language-model-only" in argv
-    assert argv[argv.index("--max-model-len") + 1] == "8192"
+    assert argv[argv.index("--max-model-len") + 1] == "65536"
     assert "--enable-auto-tool-choice" in argv
     assert "--trust-remote-code" not in argv
 

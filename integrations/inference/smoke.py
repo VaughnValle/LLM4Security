@@ -12,6 +12,7 @@ from .client import InferenceClient
 def probe(client, padding_repeats=0):
     start = time.monotonic()
     report = {
+        "padding_repeats": padding_repeats,
         "models": client.models(),
         "deployment": {
             key: os.getenv(key)
@@ -80,12 +81,28 @@ def main():
         help="Add repeated words; inspect usage.prompt_tokens for actual context size",
     )
     parser.add_argument("--output", type=Path, default=Path("results/inference-smoke.json"))
+    parser.add_argument(
+        "--min-prompt-tokens",
+        type=int,
+        default=0,
+        help="Fail if the measured tool-call prompt is shorter than this acceptance target",
+    )
     args = parser.parse_args()
     if not 0 <= args.padding_repeats <= 64000:
         parser.error("padding-repeats must be 0..64000")
+    if not 0 <= args.min_prompt_tokens <= 65536:
+        parser.error("min-prompt-tokens must be 0..65536")
     client = InferenceClient()
     try:
         report = {"ok": True, **probe(client, args.padding_repeats)}
+        measured = report["tool_call"].get("usage", {}).get("prompt_tokens", 0)
+        report["min_prompt_tokens"] = args.min_prompt_tokens
+        if measured < args.min_prompt_tokens:
+            report.update(
+                ok=False,
+                error=f"Measured {measured} prompt tokens; "
+                f"required at least {args.min_prompt_tokens}",
+            )
     except Exception as exc:
         report = {"ok": False, "error": str(exc)}
     finally:
