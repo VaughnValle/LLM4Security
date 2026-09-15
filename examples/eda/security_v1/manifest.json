@@ -1,0 +1,65 @@
+{
+  "version": "security-v1",
+  "cases": [
+    {
+      "id": "case_01",
+      "family": "authorization",
+      "requirement": "Access is granted exactly when request and privileged are both asserted, regardless of bypass.",
+      "expected": "property_held_for_test"
+    },
+    {
+      "id": "case_02",
+      "family": "authorization",
+      "requirement": "Access is granted exactly when request and privileged are both asserted, regardless of bypass.",
+      "expected": "property_violated"
+    },
+    {
+      "id": "case_03",
+      "family": "register_lock",
+      "requirement": "Reset clears the register. Either write port may update it while unlocked; neither port may change it while locked.",
+      "expected": "property_held_for_test"
+    },
+    {
+      "id": "case_04",
+      "family": "register_lock",
+      "requirement": "Reset clears the register. Either write port may update it while unlocked; neither port may change it while locked.",
+      "expected": "property_violated"
+    },
+    {
+      "id": "case_05",
+      "family": "debug_access",
+      "requirement": "Debug output equals the protected byte only when debug_read and authorized are asserted; otherwise output is zero.",
+      "expected": "property_held_for_test"
+    },
+    {
+      "id": "case_06",
+      "family": "debug_access",
+      "requirement": "Debug output equals the protected byte only when debug_read and authorized are asserted; otherwise output is zero.",
+      "expected": "property_violated"
+    },
+    {
+      "id": "case_07",
+      "family": "reset_clear",
+      "requirement": "Synchronous reset has priority over load and clears stored data to zero. Otherwise load updates it and idle holds it.",
+      "expected": "property_held_for_test"
+    },
+    {
+      "id": "case_08",
+      "family": "reset_clear",
+      "requirement": "Synchronous reset has priority over load and clears stored data to zero. Otherwise load updates it and idle holds it.",
+      "expected": "property_violated"
+    },
+    {
+      "id": "case_09",
+      "family": "output_isolation",
+      "requirement": "Enabled output equals protected data. Disabled output is zero for every protected byte.",
+      "expected": "property_held_for_test"
+    },
+    {
+      "id": "case_10",
+      "family": "output_isolation",
+      "requirement": "Enabled output equals protected data. Disabled output is zero for every protected byte.",
+      "expected": "property_violated"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+# Prefer scripts/configure_hermes.py: it authenticates, checks actual context,
+# and stores model.api_key privately (OPENAI_API_KEY alone is insufficient for
+# this Hermes custom-provider path). Never commit the populated config.
+model:
+  default: Qwen3.8-27B
+  provider: custom
+  base_url: http://127.0.0.1:8000/v1
+  # Must match the real vLLM limit, never a compatibility override.
+  context_length: 65536
+  streaming: false
+agent:
+  max_turns: 8
+  reasoning_effort: none
+platform_toolsets:
+  cli: [guide-eda-mcp]
+mcp_servers:
+  guide-eda-mcp:
+    timeout: 420
+    supports_parallel_tool_calls: false
+    command: /absolute/path/to/LLM4Security/.venv/bin/guide-eda-mcp
+    env:
+      GUIDE_ROOT: /absolute/path/to/GUIDE
+      EDA_ARTIFACT_ROOT: /absolute/path/to/LLM4Security/results/eda
+      EDA_IMAGE: llm4security-eda:phase1

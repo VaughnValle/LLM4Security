@@ -8,6 +8,33 @@ An LLM hypothesizes vulnerabilities and drafts security properties, while the si
 
 The goal here is to test whether specialized agent delegation with EDA-grounded feedback beats a single use LLM as a tool.
 
+## Current Status: Phase 1
+
+Phase 1 provides a working single-agent RTL verification pipeline on one AMD
+Radeon AI PRO R9700. Qwen3.8-27B is served through ROCm and vLLM with a validated
+65,536-token context window and one active generation.
+
+Hermes can call the `guide-eda-mcp` tools to compile and simulate GUIDE-relative
+Verilog/SystemVerilog sources in isolated Docker containers. The initial ten-case
+synthetic suite covers authorization, register locking, debug access, reset
+clearing, and output isolation.
+
+Validated results:
+
+- 64,292-token inference request completed successfully.
+- Hermes completed the NOT-gate compile/simulate acceptance test.
+- All 67 guest tests passed, including Docker execution.
+- The deterministic and Qwen-driven synthetic trials produced the expected
+  results for all ten cases.
+
+Phase 1 validates inference, structured tool use, and interpretation of supplied
+testbench evidence. Multi-agent delegation, autonomous source analysis, source
+editing, synthesis, and formal verification remain planned work.
+
+See [Phase 1 documentation](docs/phase1.md), the
+[deployment record](docs/r9700-deployment.md), and the
+[security-suite protocol](docs/security-suite.md).
+
 ## Research Question
 
 > Does specialized LLM orchestration with EDA-grounded feedback improve hardware-security reasoning compared with a single tool-using LLM, under equal model and compute budgets?
@@ -45,7 +72,7 @@ flowchart TD
     OBS --> PROM[Prometheus / Grafana]
 ```
 
-Agents never get an unrestricted host shell — every EDA and security operation is exposed through a structured MCP server, run inside ephemeral Docker containers or task-specific Git worktrees. Delegation flows through the task broker (Redis queue) rather than nested agent conversations, with PostgreSQL holding evidence, hypotheses, and task state — so a crashed worker, context overflow, or model-server restart doesn't erase run history. See [Scale-Out](#scale-out-dual-r9700) for the dual-GPU supervisor/worker-pool topology.
+The deployed research toolset exposes compilation and simulation through MCP and ephemeral Docker containers. The planned architecture adds role restrictions, task worktrees, Redis delegation, and PostgreSQL evidence/hypothesis state. These broker and multi-agent components are still scaffolds. See [Scale-Out](#scale-out-dual-r9700) for the proposed dual-GPU topology.
 
 ## Evidence-Grounded Workflow
 
@@ -100,34 +127,34 @@ The Supervisor keeps a running hypothesis ledger scored against evidence IDs —
 | Component | Reference setup |
 |---|---|
 | **GPU** | 1× Radeon AI PRO R9700 (32 GB) |
-| **CPU** | 16–24+ strong cores |
-| **RAM** | 128 GB minimum; 192–256 GB preferred |
+| **CPU** | Ryzen 3950X (16 cores / 32 threads) |
+| **RAM** | 96 GB installed on Proxmox host; start with a 64 GB GPU guest |
 | **Storage** | 2–4 TB NVMe |
 | **Network** | 10 GbE preferred |
 | **OS** | Ubuntu 24.04 |
 | **GPU runtime** | ROCm |
 | **Model** | Qwen3.8-27B, ~4-bit |
 | **Serving** | vLLM |
-| **Default context** | 64K |
-| **Concurrency** | 1–2 active generations initially |
+| **Default context** | 64K validated on one R9700; one active sequence |
+| **Concurrency** | 1 active generation initially |
 | **Orchestration** | Hermes Agent |
 
-A single GPU is primarily a **throughput constraint**, not a functional limitation — specialist agents are logical roles sharing one model endpoint, while EDA jobs run mainly on CPU resources. **RAM is not optional headroom:** the CPU simultaneously runs Verilator/Yosys compilations, formal solvers, container overhead, and PostgreSQL/MinIO, so a strong GPU paired with a weak CPU or insufficient RAM is a poor trade even at this scale.
+A single GPU supports the current model and validated 64K context. The planned specialist roles can share that endpoint with separate histories; the current configuration permits one active generation at a time. EDA jobs also need CPU and system RAM: Icarus compilation/simulation runs there today, while synthesis, formal solvers, and database services are planned additions.
 
 See [Scale-Out: Dual-R9700](#scale-out-dual-r9700) for the Phase 2 configuration.
 
 ## Agent Topology
 
-All four agents are logical roles sharing one model endpoint in Phase 1 (see Architecture above).
+The following four-role topology is planned. Phase 1 currently validates one Hermes agent using `compile_rtl()` and `simulate()`; role definitions exist, but supervisor delegation and broker execution are not yet implemented. All four roles can share the existing model endpoint with separate instructions, histories, tool permissions, and budgets. A second GPU is not required for role separation.
 
-| Agent | Responsibilities |
+| Planned agent | Intended responsibilities |
 |---|---|
 | **Supervisor** | Interprets the task, builds the task DAG, delegates, tracks experiment state and token/tool budgets, reconciles conflicting conclusions, stores full trajectories. Never mutates the canonical GUIDE checkout. |
 | **Hardware Security Analyst** | RTL comprehension, asset/trust-boundary identification, threat modeling, security hypothesis generation, candidate SVA/property drafting, Trojan-related analysis. |
 | **Verification Agent** | Converts hypotheses into evidence: compiles RTL, runs testbenches/cocotb, drives Verilator/Icarus simulation and Yosys synthesis, launches formal proofs, analyzes counterexamples and waveforms. Strongly prefers structured MCP calls over shell access. |
-| **Critic / Reviewer** | Independent, read-only review: challenges unsupported findings, detects hallucinated vulnerabilities, checks that tool evidence actually supports the claim, rejects incomplete verification. |
+| **Critic / Reviewer** | Read-only review with a separate history: challenges unsupported findings, checks that tool evidence supports the claim, and flags incomplete verification. Blind-review experiments withhold the Analyst's reasoning and conclusion while supplying the task and relevant evidence. |
 
-As throughput needs grow, the Analyst can later be split into RTL Analyst / Security Property Agent / Adversarial-Trojan Agent without changing the supervisor topology. See [Scale-Out](#scale-out-dual-r9700) for the Phase 2 independent-verifier deployment mode.
+The Analyst can later be split into RTL Analyst / Security Property Agent / Adversarial-Trojan Agent as task specialization warrants. Reviewer independence depends on information access and review protocol, not GPU placement. Sharing an endpoint does not merge conversation histories, and separate replicas of the same model can still make correlated errors. See [Scale-Out](#scale-out-dual-r9700) for proposed capacity and serving-isolation options.
 
 ## Model Layer
 
@@ -135,9 +162,9 @@ As throughput needs grow, the Analyst can later be split into RTL Analyst / Secu
 |---|---|
 | Model | Qwen3.8-27B (fixed across all agents to avoid confounding orchestration results with model differences) |
 | Quantization | ~4-bit |
-| Context | 64K (default; avoid maxing this out — KV cache competes with weights and runtime buffers inside 32 GB VRAM) |
-| Serving | vLLM (primary), SGLang (comparison backend), llama.cpp (reference baseline) |
-| Concurrency | 1–2 active generations initially |
+| Context | 65,536-token serving limit validated on one R9700; long-prompt probe used 64,292 input tokens |
+| Serving | vLLM deployed; SGLang and llama.cpp comparisons planned |
+| Concurrency | One active generation configured and validated; additional requests queue |
 
 For GUIDE tasks, prefer retrieval (module index, dependency graph, security metadata, prior tool results) over stuffing the whole repository into context.
 
@@ -149,7 +176,7 @@ Tools are wrapped in domain-specific MCP servers rather than giving the LLM raw 
 
 ### `guide-eda-mcp`
 
-Planned operations, wrapping standard EDA in ephemeral Docker/Git worktrees:
+Implemented in disposable Docker containers: `compile_rtl()` and `simulate()` (see [Phase 1](docs/phase1.md)). Full planned interface:
 `lint_rtl()`, `compile_rtl()`, `simulate()`, `run_cocotb()`, `synthesize()`, `get_netlist_stats()`, `prove_property()`, `find_counterexample()`, `parse_vcd()` (JSON or rendered PNG for multimodal review), `compare_outputs()`
 
 ### `guide-security-mcp`
@@ -206,7 +233,7 @@ LLM4Security/
 │
 ├── agents/              # Supervisor, Analyst, Verifier, Critic prompts/configs
 ├── skills/              # rtl-analysis, security-assertions, formal-verification, trojan-analysis
-├── mcp/
+├── guide_mcp/
 │   ├── eda_server/
 │   └── security_server/
 ├── broker/              # Redis task queue + PostgreSQL evidence/hypothesis store
@@ -232,7 +259,7 @@ LLM4Security/
 
 ## Ablation Plan
 
-Keep model, quantization, context budget (64K), and tool versions fixed across all configurations:
+Planned experiments hold model, quantization, context budget (64K after validation), and tool versions fixed across all configurations:
 
 | Config | Model | Tools | Agents |
 |---|---|---|---:|
@@ -263,6 +290,8 @@ Every delegated task gets an isolated environment: read-only GUIDE base checkout
 
 ## Scale-Out: Dual-R9700
 
+Proposed two-replica deployment; not yet implemented or validated:
+
 ```mermaid
 flowchart LR
     H[Hermes / Agent Requests] --> R[Request Router]
@@ -270,13 +299,13 @@ flowchart LR
     R --> B[Qwen3.8-27B Replica B<br/>R9700 #2 — Worker Pool]
 ```
 
-The second GPU is a **scale-out upgrade**, not a prerequisite for Phase 1. Two homogeneous ROCm cards unlock configurations a single card can't:
+The second GPU is an optional capacity upgrade. Phase 1 already supports the current model at 64K on one R9700. Two cards offer alternative deployments:
 
-- **Supervisor / worker-pool split** — the Supervisor gets a dedicated endpoint while the Analyst, Verifier, and Critic share a batched worker-model pool via vLLM's continuous batching, so specialist agents don't each need a dedicated GPU.
-- **Independent-verifier mode** — for hallucination-focused ablations, run the Verification/Critic path against its own model replica rather than sharing a generation queue with the Analyst, so the verifier never shares reasoning context or sampling state with the agent it's checking.
-- **64 GB combined pool** — an option for a larger model, if that becomes the priority instead of agent concurrency.
+- **Supervisor / worker-pool split** — one replica serves the Supervisor while another serves the Analyst, Verifier, and Critic. This provides separate inference capacity. Worker batching and simultaneous long-context requests require configuration and capacity testing; specialists do not each need a GPU.
+- **Dedicated reviewer replica** — alternatively, reserve one replica for Verification/Critic requests to isolate serving resources from the Analyst. Blind review can also run on the shared endpoint using separate histories and controlled evidence access. A dedicated replica does not by itself improve factual accuracy or eliminate correlated model errors.
+- **64 GB aggregate VRAM for model parallelism** — alternatively, split a supported model across both cards. VRAM is not automatically a unified pool: this requires validation of model/quantization support, ROCm communication, PCIe topology, and memory overhead. Two independent replicas each retain a separate 32 GB budget. See [vLLM parallelism documentation](https://docs.vllm.ai/en/v0.10.1/serving/parallelism_scaling.html).
 
-None of this requires an architecture change from Phase 1 — it's a routing/deployment change, not a redesign.
+The intended broker design separates agent roles from endpoint placement so replicas can be added through routing and deployment configuration. That remains a design goal: routing, scheduling, failure handling, and multi-agent orchestration still need implementation and validation. Model parallelism is a separate serving configuration from replica scaling.
 
 ## Deployment Roadmap
 
@@ -286,7 +315,7 @@ None of this requires an architecture change from Phase 1 — it's a routing/dep
 4. **Multi-agent delegation** — introduce Supervisor + Analyst + Verifier + Critic, routed through the Redis task broker rather than nested conversations.
 5. **Experiment infrastructure** — PostgreSQL, artifact store, Langfuse/OpenTelemetry, Grafana, reproducible YAML configs.
 6. **GUIDE benchmarks** — progress from security-property generation → small Trust-Hub designs → Trojan detection/localization → GHOST/ATTRITION-style adversarial workflows → LockForge experiments.
-7. **Phase 2 scale-out** — once throughput, not capability, is the bottleneck, split Supervisor and worker-pool onto a second R9700 (or add worker replicas / heterogeneous model tiers); see [Scale-Out](#scale-out-dual-r9700) — the task-broker architecture requires no redesign to extend.
+7. **Phase 2 scale-out** — once measurements establish a throughput bottleneck, evaluate a second R9700 for separate replicas or model parallelism; see [Scale-Out](#scale-out-dual-r9700). Validate routing, scheduling, and resource limits for the chosen deployment.
 
 ## Security & Isolation Considerations
 
@@ -304,7 +333,8 @@ None of this requires an architecture change from Phase 1 — it's a routing/dep
 - Does an independent critic agent improve precision enough to justify its token/latency cost?
 - Does structured MCP tool access outperform unrestricted shell access in reliability and reproducibility?
 - Does multimodal waveform interpretation improve debugging over structured signal-transition summaries?
-- Does an independent verifier on a separate model replica reduce hallucinated findings compared to a verifier sharing generation context with the Analyst?
+- Does blind review reduce unsupported findings compared to review that includes the Analyst's reasoning and conclusion, with model and serving configuration held fixed?
+- How does a dedicated reviewer replica affect latency and throughput when the review protocol and model are held fixed?
 - Does tiering cheaper models to easier subtasks (triage, log parsing, simulation-running) preserve finding quality while reducing GPU-seconds per run?
 
 ## Future Work
@@ -313,12 +343,18 @@ Worker-pool replica scaling · higher-precision or larger local models · RTL/se
 
 ## Status
 
-This repository is currently an **initial research scaffold**. Most modules intentionally contain interfaces, schemas, configuration examples, and TODOs rather than complete implementations.
+The **Phase 1 software path** is implemented: single-R9700 ROCm/vLLM configuration,
+OpenAI endpoint acceptance checks, Hermes configuration, `guide-eda-mcp` stdio tools
+for `compile_rtl()` and `simulate()`, and a bounded single-agent feedback loop.
+See [Phase 1 deployment and validation](docs/phase1.md) for the 96 GB Proxmox host,
+installation and tests, and the [deployment record](docs/r9700-deployment.md) for
+measured context capacity and Hermes acceptance. A [synthetic authorization
+baseline](docs/authorization-baseline.md) evaluates model verdicts against linked
+tool evidence. The [10-case security suite](docs/security-suite.md) adds five
+safe/faulty pairs, per-case execution logs, and separate evidence, verdict, and
+format-compliance scores. Broker, multi-agent experiments, source editing, and other EDA
+tools remain future work; a passing smoke test is not a hardware-security finding.
 
 ## License
 
 See [LICENSE](LICENSE).
-
----
-
-> **Use the LLM to generate, prioritize, and revise hypotheses; use hardware tools to establish ground truth.**

@@ -1,7 +1,15 @@
 from enum import StrEnum
+
 from pydantic import BaseModel, Field
+
+
 class AgentRole(StrEnum):
-    SUPERVISOR='supervisor'; ANALYST='analyst'; VERIFIER='verifier'; CRITIC='critic'
+    SUPERVISOR = "supervisor"
+    ANALYST = "analyst"
+    VERIFIER = "verifier"
+    CRITIC = "critic"
+
+
 class Task(BaseModel):
     task_id: str
     agent: AgentRole
