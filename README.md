@@ -2,12 +2,38 @@
 
 **EDA-grounded multi-agent LLM orchestration for hardware security research.**
 
-LLM4Security is a local, reproducible research platform for evaluating **multi-agent LLM orchestration in hardware-security workflows**. It is an independent framework designed to integrate with the [GUIDE](https://github.com/GUIDE-EDA/GUIDE) ecosystem — using GUIDE and Trust-Hub workloads as its initial evaluation suite, without assuming it lives inside a GUIDE checkout — while combining a Hermes-based orchestration layer, a local **Qwen3.8-27B** model, and MCP-wrapped EDA tooling to test whether specialized agent delegation with EDA-grounded feedback beats a single tool-using LLM.
+LLM4Security is a local, reproducible research platform for evaluating **multi-agent LLM orchestration in hardware-security workflows**. It is an independent framework designed to integrate with [GUIDE](https://github.com/GUIDE-EDA/GUIDE) while combining a Hermes-based orchestration layer, a local **Qwen3.8-27B** model, and MCP-wrapped EDA tooling.
 
-The **Phase 1 reference implementation** runs on a single **AMD Radeon AI PRO R9700 (32 GB)**. Qwen3.8-27B inference and a single Hermes agent's compile/simulate workflow have been validated; see the [deployment record](docs/r9700-deployment.md). The Supervisor and specialist-agent topology below is planned. A later **2× R9700** deployment (see [Scale-Out](#scale-out-dual-r9700)) can add a second model replica for higher concurrency and independent-verifier experiments after the single-agent baseline is measured.
+An LLM hypothesizes vulnerabilities and drafts security properties, while the simulation, synthesis, and formal verification run in disposable sandboxes that validate the LLM "supervisor's" hypotheses into findings.
 
-> **Core principle: Agents propose; tools decide.**
-> The LLM hypothesizes vulnerabilities and drafts security properties, but simulation, synthesis, and formal verification — run in disposable sandboxes — are what turn a hypothesis into a finding.
+The goal here is to test whether specialized agent delegation with EDA-grounded feedback beats a single use LLM as a tool.
+
+## Current Status: Phase 1
+
+Phase 1 provides a working single-agent RTL verification pipeline on one AMD
+Radeon AI PRO R9700. Qwen3.8-27B is served through ROCm and vLLM with a validated
+65,536-token context window and one active generation.
+
+Hermes can call the `guide-eda-mcp` tools to compile and simulate GUIDE-relative
+Verilog/SystemVerilog sources in isolated Docker containers. The initial ten-case
+synthetic suite covers authorization, register locking, debug access, reset
+clearing, and output isolation.
+
+Validated results:
+
+- 64,292-token inference request completed successfully.
+- Hermes completed the NOT-gate compile/simulate acceptance test.
+- All 67 guest tests passed, including Docker execution.
+- The deterministic and Qwen-driven synthetic trials produced the expected
+  results for all ten cases.
+
+Phase 1 validates inference, structured tool use, and interpretation of supplied
+testbench evidence. Multi-agent delegation, autonomous source analysis, source
+editing, synthesis, and formal verification remain planned work.
+
+See [Phase 1 documentation](docs/phase1.md), the
+[deployment record](docs/r9700-deployment.md), and the
+[security-suite protocol](docs/security-suite.md).
 
 ## Research Question
 
@@ -20,7 +46,6 @@ The design deliberately separates three variables so ablations are controlled ra
 3. **Hardware ground truth** — simulation, synthesis, formal verification, GUIDE/Trust-Hub tooling
 
 ## Architecture
-
 ```mermaid
 flowchart TD
     U[Researcher / Experiment CLI] --> H[Hermes Supervisor]
@@ -333,7 +358,3 @@ tools remain future work; a passing smoke test is not a hardware-security findin
 ## License
 
 See [LICENSE](LICENSE).
-
----
-
-> **Use the LLM to generate, prioritize, and revise hypotheses; use hardware tools to establish ground truth.**
