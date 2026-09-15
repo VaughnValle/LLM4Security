@@ -15,7 +15,7 @@ from mcp.client.stdio import stdio_client
 from integrations.inference.client import InferenceClient
 
 
-async def run_loop(client, session, prompt, max_turns=8):
+async def run_loop(client, session, prompt, max_turns=8, *, trace=None):
     if not 1 <= max_turns <= 20:
         raise ValueError("max_turns must be between 1 and 20")
     discovered = (await session.list_tools()).tools
@@ -43,6 +43,9 @@ async def run_loop(client, session, prompt, max_turns=8):
         {"role": "user", "content": prompt},
     ]
     events = []
+    if trace is not None:
+        # Keep completed evidence accessible if a later inference request fails.
+        trace.update(messages=messages, events=events)
     compiled_ids = set()
     verified = False
     for _ in range(max_turns):

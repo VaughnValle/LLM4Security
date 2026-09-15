@@ -131,6 +131,22 @@ def test_early_answer_is_incomplete():
     assert report["status"] == "incomplete"
 
 
+def test_completed_evidence_survives_later_inference_failure():
+    import pytest
+
+    class FailingClient(FakeClient):
+        def chat(self, messages, **kwargs):
+            if any(message["role"] == "tool" for message in messages):
+                raise RuntimeError("inference unavailable")
+            return super().chat(messages, **kwargs)
+
+    trace = {}
+    with pytest.raises(RuntimeError, match="inference unavailable"):
+        asyncio.run(run_loop(FailingClient(["compile_rtl"]), FakeSession(), "test", trace=trace))
+    assert trace["events"][-1]["name"] == "compile_rtl"
+    assert trace["messages"][-1]["role"] == "tool"
+
+
 def test_model_to_real_mcp_to_real_icarus(tmp_path):
     import shutil
 
