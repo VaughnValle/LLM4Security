@@ -8,7 +8,7 @@ An LLM hypothesizes vulnerabilities and drafts security properties, while the si
 
 The goal here is to test whether specialized agent delegation with EDA-grounded feedback beats a single use LLM as a tool.
 
-## Current Status: Phase 1
+## Status: Phase 1
 
 Phase 1 provides a working single-agent RTL verification pipeline on one AMD
 Radeon AI PRO R9700. Qwen3.8-27B is served through ROCm and vLLM with a validated
@@ -341,7 +341,7 @@ The intended broker design separates agent roles from endpoint placement so repl
 
 Worker-pool replica scaling · higher-precision or larger local models · RTL/security fine-tuning and LoRA from successful trajectories · agent-specific models and learned routing · automated benchmark generation · Trojan red-team/blue-team agent pairs · RTL repair agents · FPGA-in-the-loop verification · power/side-channel tooling · extending unit agents beyond RTL/Trojan detection into firmware reversing, protocol/JTAG analysis, and side-channel tooling for full hardware-security audits (a scope decision to make deliberately, not by accretion).
 
-## Status
+## Status (Codex-Generated)
 
 The **Phase 1 software path** is implemented: single-R9700 ROCm/vLLM configuration,
 OpenAI endpoint acceptance checks, Hermes configuration, `guide-eda-mcp` stdio tools
