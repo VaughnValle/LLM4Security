@@ -1,0 +1,167 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.12.9"
+  UV_PYTHON_DOWNLOADS: automatic
+
+jobs:
+  quality:
+    name: Quality and lockfile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --python 3.12 --locked --extra dev --extra eda
+      - name: Lint
+        run: uv run --no-sync ruff check .
+      - name: Formatting
+        run: uv run --no-sync ruff format --check .
+      - name: Validate GitHub Actions workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+
+  tests:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --python '${{ matrix.python }}' --locked --extra dev --extra eda
+      - name: Install real RTL compiler
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends iverilog
+      - name: Unit, MCP, and native RTL tests
+        run: >-
+          uv run --no-sync pytest -q
+          --junitxml=results/ci/junit.xml
+          --cov=agents --cov=broker --cov=guide_mcp --cov=integrations --cov=runner --cov=schemas
+          --cov-report=term-missing --cov-report=xml:results/ci/coverage.xml
+          --cov-report=html:results/ci/html
+          --cov-fail-under=60
+      - name: Save test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tests-python-${{ matrix.python }}
+          path: results/ci/
+          if-no-files-found: warn
+          retention-days: 14
+
+  package:
+    name: Build and installed CLI smoke tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv python install 3.12
+      - name: Build sdist and wheel
+        run: uv build --python 3.12
+      - name: Install wheel outside the checkout and test entry points
+        shell: bash
+        run: |
+          uv venv --python 3.12 "$RUNNER_TEMP/wheel-venv"
+          wheels=("$PWD"/dist/*.whl)
+          test "${#wheels[@]}" -eq 1
+          uv pip install --python "$RUNNER_TEMP/wheel-venv/bin/python" "${wheels[0]}[eda]"
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/wheel-venv/bin/python" -c 'import guide_mcp, integrations.inference, runner, schemas'
+          "$RUNNER_TEMP/wheel-venv/bin/guide-eda-mcp" --help
+          "$RUNNER_TEMP/wheel-venv/bin/llm4security-eda-loop" --help
+          "$RUNNER_TEMP/wheel-venv/bin/llm4security-inference-smoke" --help
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: python-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  docker:
+    name: Docker EDA and deployment configuration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      EDA_ARTIFACT_ROOT: ${{ github.workspace }}/results/ci/eda
+      EDA_IMAGE: llm4security-eda:phase1
+      VIDEO_GID: "44"
+      RENDER_GID: "109"
+      OPENAI_API_KEY: ci-placeholder-not-a-real-key
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --python 3.12 --locked --extra dev --extra eda
+      - name: Validate Compose manifests without starting infrastructure or inference
+        run: |
+          docker compose --env-file .env.example -f docker-compose.yml config --quiet
+          docker compose --env-file .env.example -f deploy/inference/compose.yaml config --quiet
+      - name: Build EDA sandbox image
+        run: docker build --pull -t llm4security-eda:phase1 containers/eda
+      - name: Docker artifact export smoke test
+        run: uv run --no-sync pytest -q tests/test_eda.py::test_real_docker_loop --junitxml=results/ci/docker-junit.xml
+        env:
+          RUN_DOCKER_TESTS: "1"
+      - name: Run all ten synthetic cases through real MCP and Docker
+        env:
+          GUIDE_ROOT: ${{ runner.temp }}/guide-fixtures
+        run: |
+          mkdir -p "$GUIDE_ROOT"
+          git init "$GUIDE_ROOT"
+          uv run --no-sync python -m runner.security_suite --output results/ci/security-suite
+      - name: Save sandbox logs, waveforms, and case reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: docker-eda-evidence
+          path: results/ci/
+          if-no-files-found: warn
+          retention-days: 14
+
+  required:
+    name: CI passed
+    if: always()
+    needs: [quality, tests, package, docker]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to succeed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | jq -e 'all(.[]; .result == "success")'

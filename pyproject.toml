@@ -26,7 +26,12 @@ llm4security-eda-loop = "runner.eda_loop:main"
 
 [project.optional-dependencies]
 eda = ["mcp>=1.26,<2", "jsonschema>=4.23"]
-dev = ["pytest>=8.3", "ruff>=0.7", "mypy>=1.13"]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "pytest-cov>=6,<8",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["agents", "broker", "integrations", "guide_mcp", "runner", "schemas"]
