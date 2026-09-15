@@ -1,20 +1,18 @@
 # R9700 deployment record
 
-Provisioned on 2026-09-14. Host: Proxmox `10.0.89.35`, Ryzen 3950X,
-96 GB RAM. Guest: VM 200 (`llm4security-r9700`), `researcher@10.0.89.200`.
+Provisioned on 2026-09-14 on a Proxmox host with a Ryzen 3950X and
+96 GB RAM, using a dedicated Linux GPU guest.
 
 ## Guest configuration
 
 - Q35, OVMF, Secure Boot keys disabled; 16 host-model vCPUs.
-- 64 GB fixed RAM; 300 GB thin-provisioned disk on `local-lvm`.
-- `vmbr0`, static `10.0.89.200/24`, gateway/DNS `10.0.89.1`.
-- Both R9700 functions passed through with `hostpci0: 0000:0c:00,pcie=1`.
+- 64 GB fixed RAM; 300 GB thin-provisioned disk.
+- Bridged networking; configure addressing, gateway, and DNS for your network.
+- Both R9700 functions (graphics and audio) passed through as PCIe devices.
 - Ubuntu 24.04.5, kernel `6.17.0-42-generic`, inbox `amdgpu` driver.
-- Kernel selected in `/etc/default/grub.d/99-llm4security-kernel.cfg`.
-  A newer HWE kernel is installed too; changing the selected kernel requires
-  rerunning GPU and inference acceptance.
+- Kernel selection is pinned; changing it requires rerunning GPU and inference acceptance.
 - QEMU guest agent, Docker Engine, Compose, uv, Icarus, and AMD ROCm tools installed.
-  `researcher` belongs to `docker`, `video`, and `render`.
+  The guest service user belongs to `docker`, `video`, and `render`.
 
 ROCm identifies `AMD Radeon AI PRO R9700`, `gfx1201`. Container PyTorch reports
 34,208,743,424 bytes of VRAM and HIP `7.2.53211`. The GPU's upstream CPU link is
@@ -37,7 +35,7 @@ Checkpoint: `amd/Qwen3.8-27B-Quark-AWQ-INT4-W4A16`, revision
 were rewritten. Text-only serving uses one GPU, 65,536 context tokens, one active
 sequence, eager execution, and 85% VRAM utilization.
 
-Hermes is installed at `/home/researcher/.hermes/hermes-agent`, pinned to
+Hermes is installed at `~/.hermes/hermes-agent`, pinned to
 `01bae2f9295d7e9797a7c93b8c9b0ac7c8a47f9e`. Its config points to the local
 OpenAI-compatible endpoint and `guide-eda-mcp`. Its actual context matches vLLM.
 The custom-provider credential is stored as private `model.api_key` in the
@@ -45,7 +43,7 @@ mode-600 Hermes config, sourced from the guest's private `.env`. Environment-onl
 authentication did not work for this custom-provider path. Credentials are not
 included in this record.
 
-GUIDE remains at `/home/researcher/GUIDE`, revision
+GUIDE remains in an external checkout selected through `GUIDE_ROOT`, revision
 `a3f8643498fe062be1e1e5e6fa5e62bd03470e98`. VerilogEval is an external GUIDE
 submodule at `c498220d0a52248f8e3fdffe279075215bde2da6`.
 The local `.llm4security-smoke` wrapper is deliberately separate from its
@@ -53,8 +51,11 @@ upstream benchmark sources.
 
 ## Operating commands
 
+Replace `GUEST_USER` and `GUEST_HOST` with your SSH username and guest address.
+The checkout path below assumes the repository is under your home directory.
+
 ```bash
-ssh researcher@10.0.89.200
+ssh GUEST_USER@GUEST_HOST
 cd ~/LLM4Security
 make inference-up
 make inference-smoke
@@ -64,7 +65,7 @@ docker compose --env-file .env -f deploy/inference/compose.yaml logs -f inferenc
 For workstation clients, keep the service bound to guest loopback:
 
 ```bash
-ssh -N -L 8000:127.0.0.1:8000 researcher@10.0.89.200
+ssh -N -L 8000:127.0.0.1:8000 GUEST_USER@GUEST_HOST
 ```
 
 Client URL: `http://127.0.0.1:8000/v1`; model alias: `Qwen3.8-27B`.

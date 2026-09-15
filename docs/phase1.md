@@ -9,13 +9,13 @@ Unit tests alone are not evidence of GPU compatibility or security findings.
 
 ## Proxmox deployment target
 
-The supplied machine is `https://10.0.89.35:8006`, Ryzen 3950X, 96 GB system RAM,
-with one 32 GB Radeon AI PRO R9700. Port 8006 is Proxmox management, not inference.
-Use a dedicated Ubuntu 24.04 Linux VM with the GPU passed through. The deployed
-guest is VM 200 at `10.0.89.200`, with SSH user `researcher`. It uses Q35/OVMF,
-16 host-model vCPUs, 64 GB fixed RAM, and a 300 GB thin disk. Both functions of
-host device `0000:0c:00` are passed through. The hypervisor retains VFIO ownership;
-ROCm and Hermes run inside the guest.
+The reference host uses a Ryzen 3950X, 96 GB system RAM, and one 32 GB Radeon
+AI PRO R9700. Port 8006 is Proxmox management, not inference. Use a dedicated
+Ubuntu 24.04 Linux VM with the GPU passed through. The validated guest uses
+Q35/OVMF, 16 host-model vCPUs, 64 GB fixed RAM, and a 300 GB thin disk. Both GPU
+functions (graphics and audio) are passed through; select their PCI addresses
+from your own host. The hypervisor retains VFIO ownership; ROCm and Hermes run
+inside the guest.
 
 Suggested initial allocation: 16 vCPUs, 64 GB fixed guest RAM, and at least 200 GB
 free storage for the image, checkpoint/cache, and small experiments. Leave the rest
@@ -81,10 +81,11 @@ Quantization is read from the checkpoint metadata. The inference container has a
 two simultaneous 64K generations fit; only one active sequence has been validated.
 
 The service binds guest loopback. For clients on your workstation, tunnel to the
-**guest**, then keep `OPENAI_BASE_URL=http://127.0.0.1:8000/v1`:
+**guest**, then keep `OPENAI_BASE_URL=http://127.0.0.1:8000/v1`.
+Replace `GUEST_USER` and `GUEST_HOST` with your SSH username and guest address:
 
 ```bash
-ssh -N -L 8000:127.0.0.1:8000 USER@10.0.89.200
+ssh -N -L 8000:127.0.0.1:8000 GUEST_USER@GUEST_HOST
 ```
 
 The probe checks `/v1/models`, normal generation, automatic tool calling with JSON
@@ -124,7 +125,7 @@ The deployment smoke case uses GUIDE's pinned VerilogEval reference and a wrappe
 from this repository; it does not vendor benchmark source:
 
 ```bash
-export GUIDE_ROOT=/home/researcher/GUIDE # Or your own external checkout.
+export GUIDE_ROOT="/path/to/your/GUIDE" # Replace with your external checkout.
 git -C "$GUIDE_ROOT" submodule update --init --depth 1 benchmark/VerilogEval
 mkdir -p "$GUIDE_ROOT/.llm4security-smoke"
 cp examples/eda/notgate_acceptance.sv "$GUIDE_ROOT/.llm4security-smoke/"
