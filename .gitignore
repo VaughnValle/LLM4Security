@@ -17,6 +17,7 @@ results/*
 !results/.gitkeep
 artifacts/
 *.log
+!docs/evidence/**/*.log
 .DS_Store
 .vscode/
 .idea/

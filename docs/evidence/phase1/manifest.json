@@ -1,0 +1,14 @@
+{
+  "description": "Sanitized public copies of ignored Phase 1 execution evidence",
+  "sanitization": [
+    "VM repository and GUIDE home paths replaced with placeholders",
+    "Hermes session identifier redacted",
+    "credential and private-address scan required before output"
+  ],
+  "sha256": {
+    "security-v1-agent-20260914/report.json": "466213a455b2db1def85d53d4f5fba0a20a1a5e69e55be601ba462619c92961e",
+    "security-v1-agent-20260914/steps.md": "41a00ba8df8d04d8a6966a3f815e4db75b5edd8f69cd5207fdd73a1fa96647e7",
+    "security-v1-tools-20260914/report.json": "1eb451bbdae46d59109ef678e9a23bf4f1cb640e2572ed1f1eb6db5a2f359e95",
+    "hermes-64k-acceptance-final.log": "776af2a2510ac936bfc7e85b4304c7342fc43dcadc6ec38fb48652bf3f0058bc"
+  }
+}
