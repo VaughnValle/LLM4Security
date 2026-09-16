@@ -124,9 +124,9 @@ The saved Hermes response misstated the simulation time; the pass result was
 checked against the underlying EDA records, and that timing statement is not used
 as a measurement in this report.
 
-The [saved Hermes response](../results/hermes-64k-acceptance-final.log) contains the
-session ID and answer; the input prompt above comes from the recorded invocation,
-since the quiet-mode output file does not echo it.
+The [saved Hermes response](evidence/phase1/hermes-64k-acceptance-final.log) contains the
+answer with its session identifier redacted; the input prompt above comes from the
+recorded invocation, since the quiet-mode output file does not echo it.
 
 ### Evaluation-runner prompts: ten-case trial
 
@@ -307,13 +307,14 @@ Future experiments should run from a synchronized, clean, pinned revision.
 - [Deployment and context validation](r9700-deployment.md)
 - [Suite protocol and scoring](security-suite.md)
 - [Construction and per-case validation record](security-suite-validation-20260914.md)
-- [Full Qwen trial](../results/security-v1-agent-20260914/report.json)
-- [Hermes acceptance response](../results/hermes-64k-acceptance-final.log)
-- [Qwen trial step log](../results/security-v1-agent-20260914/steps.md)
-- [Deterministic EDA trial](../results/security-v1-tools-20260914/report.json)
+- [Full Qwen trial](evidence/phase1/security-v1-agent-20260914/report.json)
+- [Hermes acceptance response](evidence/phase1/hermes-64k-acceptance-final.log)
+- [Qwen trial step log](evidence/phase1/security-v1-agent-20260914/steps.md)
+- [Deterministic EDA trial](evidence/phase1/security-v1-tools-20260914/report.json)
 - [Original authorization baseline](authorization-baseline.md)
 
-Raw results are retained locally and on the VM rather than committed to Git.
-Each referenced EDA run includes execution logs and provenance; simulation runs
-also include waveforms. These artifacts should accompany the report when a
-reviewer needs to audit individual findings.
+Sanitized copies of the four referenced records are committed under
+`docs/evidence/phase1/`; raw results remain local and on the VM. Each referenced
+EDA run also has execution logs, provenance, and, for simulations, waveforms.
+Those larger generated artifacts can accompany the report when a reviewer needs
+to audit an individual finding in more detail.
