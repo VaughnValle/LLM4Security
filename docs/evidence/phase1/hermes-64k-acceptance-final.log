@@ -1,0 +1,9 @@
+
+session_id: <REDACTED>
+Both calls completed successfully, made separately:
+
+- compile_rtl run_id: 0d9f479e90874e34a00775e104b3d31f (exit 0, Icarus Verilog 12.0)
+- simulate run_id: 641dc175436840b0903373ebf2827621 (exit 0, $finish called at t=1s from .llm4security-smoke/notgate_acceptance.sv:15)
+- Testbench pass marker: GUIDE_NOTGATE_PASS
+
+Waveform dump: results/eda/641dc175436840b0903373ebf2827621/waveform.vcd
