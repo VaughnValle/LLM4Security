@@ -8,7 +8,8 @@ An LLM hypothesizes vulnerabilities and drafts security properties, while the si
 
 The goal here is to test whether specialized agent delegation with EDA-grounded feedback beats a single use LLM as a tool.
 
-## Status: Phase 1
+## Status: Phase 1 implemented, Phase 2 (WIP)
+<img width="3360" height="2232" alt="llm4security-phases" src="https://github.com/user-attachments/assets/9bf58de7-f54f-4701-a8c4-20c092db26ca" />
 
 Phase 1 provides a working single-agent RTL verification pipeline on one AMD
 Radeon AI PRO R9700. Qwen3.8-27B is served through ROCm and vLLM with a validated
